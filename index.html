@@ -1,0 +1,569 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Trendglobe</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet"/>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+
+:root{
+  --bg:#f7f6f3;
+  --pill-bg:#ffffff;
+  --pill-shadow:0 1px 6px rgba(0,0,0,0.12),0 0 0 1px rgba(0,0,0,0.06);
+  --pill-shadow-hover:0 3px 14px rgba(0,0,0,0.17),0 0 0 1px rgba(0,0,0,0.09);
+  --card-shadow:0 4px 32px rgba(0,0,0,0.12),0 1px 4px rgba(0,0,0,0.06);
+}
+
+html,body{
+  width:100%;height:100%;
+  background:var(--bg);
+  font-family:'DM Sans',-apple-system,ui-sans-serif,sans-serif;
+  overflow:hidden;
+}
+
+#root{
+  width:100%;height:100%;
+  position:relative;
+  display:flex;align-items:center;justify-content:center;
+  transition:all .4s cubic-bezier(.4,0,.2,1);
+}
+
+/* ── Breakpoint shell ── */
+#shell{
+  position:relative;
+  background:var(--bg);
+  transition:width .4s cubic-bezier(.4,0,.2,1), height .4s cubic-bezier(.4,0,.2,1), border-radius .3s, box-shadow .3s;
+  overflow:hidden;
+  display:flex;align-items:center;justify-content:center;
+}
+#root.bp-desktop #shell{ width:100%; height:100%; border-radius:0; box-shadow:none; }
+#root.bp-tablet  #shell{ width:768px; height:1024px; border-radius:20px; box-shadow:0 0 0 8px #e0ddd8, 0 20px 60px rgba(0,0,0,0.22); }
+#root.bp-mobile  #shell{ width:390px; height:844px;  border-radius:44px; box-shadow:0 0 0 10px #e0ddd8, 0 0 0 12px #ccc9c2, 0 20px 60px rgba(0,0,0,0.28); }
+
+canvas{
+  position:absolute;
+  border-radius:50%;
+  display:block;
+  cursor:grab;
+  transform:translate(-50%,-50%);
+  will-change:transform;
+}
+canvas.dragging{cursor:grabbing}
+
+#ring{
+  position:absolute;
+  border-radius:50%;
+  border:7px solid #fff;
+  pointer-events:none;
+  z-index:2;
+  transform:translate(-50%,-50%);
+}
+
+/* ── Breakpoint switcher ── */
+#bpswitcher{
+  position:absolute;
+  top:18px;
+  left:50%;
+  transform:translateX(-50%);
+  z-index:100;
+  display:flex;
+  align-items:center;
+  gap:2px;
+  background:rgba(255,255,255,0.86);
+  backdrop-filter:blur(12px);
+  -webkit-backdrop-filter:blur(12px);
+  border:1px solid rgba(0,0,0,0.08);
+  border-radius:12px;
+  padding:4px;
+}
+.bp-btn{
+  display:flex;align-items:center;justify-content:center;gap:6px;
+  padding:7px 14px;
+  border:none;background:transparent;
+  border-radius:8px;
+  font-family:'DM Sans',-apple-system,sans-serif;
+  font-size:12px;font-weight:500;
+  color:#888;
+  cursor:pointer;
+  transition:background .15s,color .15s;
+  white-space:nowrap;
+}
+.bp-btn svg{flex-shrink:0;transition:stroke .15s}
+.bp-btn:hover{background:rgba(0,0,0,0.04);color:#444}
+.bp-btn.active{background:#fff;color:#1a1a1a;box-shadow:0 1px 4px rgba(0,0,0,0.10)}
+.bp-btn.active svg{stroke:#1a1a1a}
+.bp-sep{width:1px;height:16px;background:rgba(0,0,0,0.08);margin:0 2px}
+
+/* ── Hint bar ── */
+#hint{
+  position:absolute;
+  bottom:20px;
+  left:50%;
+  transform:translateX(-50%);
+  display:flex;align-items:center;gap:14px;
+  background:rgba(255,255,255,0.85);
+  backdrop-filter:blur(10px);
+  -webkit-backdrop-filter:blur(10px);
+  border:1px solid rgba(0,0,0,0.07);
+  border-radius:100px;
+  padding:7px 18px;
+  z-index:20;
+  pointer-events:none;
+  white-space:nowrap;
+  transition:opacity 1.4s ease;
+}
+.hint-item{font-size:11px;color:#aaa;display:flex;align-items:center;gap:5px;letter-spacing:.01em}
+.hint-sep{width:1px;height:11px;background:#e0e0e0}
+
+/* ── Labels ── */
+.lbl{
+  position:absolute;
+  pointer-events:auto;
+  cursor:pointer;
+  transform:translate(-50%,-50%);
+  z-index:10;
+  transition:opacity .2s;
+  will-change:left,top,opacity;
+}
+.lbl .pill{
+  display:flex;align-items:center;gap:5px;
+  background:#fff;
+  color:#1a1a1a;
+  font-family:'DM Sans',-apple-system,sans-serif;
+  font-size:11px;font-weight:500;letter-spacing:.01em;
+  padding:4px 10px 4px 7px;
+  border-radius:100px;
+  white-space:nowrap;
+  box-shadow:var(--pill-shadow);
+  transition:box-shadow .15s,transform .15s;
+}
+.lbl:hover .pill{box-shadow:var(--pill-shadow-hover);transform:scale(1.06)}
+.lbl .icon{font-size:13px;line-height:1;flex-shrink:0}
+.lbl .tname{font-weight:600;color:#111}
+.lbl .dot{width:3px;height:3px;border-radius:50%;background:#ddd;flex-shrink:0}
+.lbl .imp{font-size:10px;color:#aaa;font-weight:400}
+
+/* ── Card ── */
+#card{
+  display:none;
+  position:absolute;
+  width:272px;
+  background:#fff;
+  border-radius:14px;
+  border:1px solid rgba(55,53,47,0.11);
+  overflow:hidden;
+  z-index:30;
+  box-shadow:var(--card-shadow);
+  animation:cardPop .18s cubic-bezier(.34,1.3,.64,1);
+}
+@keyframes cardPop{from{opacity:0;transform:scale(0.95)}to{opacity:1;transform:scale(1)}}
+#card-body{padding:20px 18px 20px}
+#ce{font-size:40px;line-height:1;margin-bottom:13px}
+#card-row{display:flex;align-items:flex-start;justify-content:space-between;gap:8px;margin-bottom:3px}
+#ct{font-size:17px;font-weight:600;color:#1a1a1a;letter-spacing:-0.02em}
+#cb{font-size:11px;font-weight:500;background:#edf7ec;color:#2d6a2d;border-radius:100px;padding:3px 9px;white-space:nowrap;flex-shrink:0;margin-top:3px}
+#cc{font-size:12px;font-weight:500;color:#999;margin-bottom:10px}
+#card-hr{height:1px;background:rgba(55,53,47,0.08);margin-bottom:12px}
+#cd{font-size:13px;color:#555;line-height:1.65;margin-bottom:16px}
+#ck{
+  background:#1a1a1a;color:#fff;border:none;
+  border-radius:8px;padding:9px 16px;
+  font-size:13px;font-weight:500;font-family:inherit;cursor:pointer;
+  transition:background .15s,transform .1s;
+}
+#ck:hover{background:#333}
+#ck:active{transform:scale(0.97)}
+
+/* ── Logo ── */
+#logo{
+  position:absolute;top:18px;left:20px;z-index:100;
+  font-size:13px;font-weight:600;color:#1a1a1a;letter-spacing:-.02em;
+  display:flex;align-items:center;gap:6px;
+}
+#logo span{font-size:16px}
+</style>
+</head>
+<body>
+
+<div id="root" class="bp-desktop">
+
+  <div id="logo"><span>🌍</span> Trendglobe</div>
+
+  <!-- Breakpoint switcher -->
+  <div id="bpswitcher">
+    <button class="bp-btn active" data-bp="desktop" onclick="setBP('desktop')">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#888" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+      Desktop
+    </button>
+    <div class="bp-sep"></div>
+    <button class="bp-btn" data-bp="tablet" onclick="setBP('tablet')">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#888" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="2" width="16" height="20" rx="2"/><line x1="12" y1="18" x2="12.01" y2="18"/></svg>
+      Tablet
+    </button>
+    <div class="bp-sep"></div>
+    <button class="bp-btn" data-bp="mobile" onclick="setBP('mobile')">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#888" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="2" width="14" height="20" rx="2"/><line x1="12" y1="18" x2="12.01" y2="18"/></svg>
+      Mobile
+    </button>
+  </div>
+
+  <!-- Device shell -->
+  <div id="shell">
+    <canvas id="gc"></canvas>
+    <div id="ring"></div>
+
+    <!-- Hint -->
+    <div id="hint">
+      <span class="hint-item">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#ccc" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 11V6a2 2 0 0 0-4 0v0M14 10V4a2 2 0 0 0-4 0v0M10 10.5V6a2 2 0 0 0-4 0v0M6 14a2 2 0 0 1 4 0v4a6 6 0 0 0 12 0v-4a2 2 0 0 0-4 0"/></svg>
+        Drag to rotate
+      </span>
+      <div class="hint-sep"></div>
+      <span class="hint-item">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#ccc" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="11" y1="8" x2="11" y2="14"/><line x1="8" y1="11" x2="14" y2="11"/></svg>
+        Scroll to zoom
+      </span>
+      <div class="hint-sep"></div>
+      <span class="hint-item">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#ccc" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13S3 17 3 10a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+        Tap a label
+      </span>
+    </div>
+
+    <!-- Card -->
+    <div id="card">
+      <div id="card-body">
+        <div id="ce"></div>
+        <div id="card-row">
+          <span id="ct"></span>
+          <span id="cb"></span>
+        </div>
+        <div id="cc"></div>
+        <div id="card-hr"></div>
+        <div id="cd"></div>
+        <button id="ck">Know more →</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/topojson-client@3/dist/topojson-client.min.js"></script>
+<script>
+const ALL_TRENDS=[
+  {label:'Kpop',        emoji:'🎤',minZoom:1.0,lat:37.5, lng:127,    country:'South Korea', imp:'15.5k',desc:'New album releases and world tours dominating global charts and social feeds.',                          url:'https://www.google.com/search?q=kpop+trending'},
+  {label:'Anime',       emoji:'⛩️', minZoom:1.0,lat:35.6, lng:139.7,  country:'Japan',       imp:'82.1k',desc:'Seasonal releases breaking streaming records. New hits topping global charts.',                         url:'https://www.google.com/search?q=anime+trending'},
+  {label:'Bollywood',   emoji:'🎬',minZoom:1.0,lat:20,   lng:77,     country:'India',       imp:'120k', desc:'Blockbuster releases and celebrity weddings keeping Bollywood trending across South Asia.',              url:'https://www.google.com/search?q=bollywood+trending'},
+  {label:'World Cup',   emoji:'⚽',minZoom:1.0,lat:39,   lng:-98,    country:'USA',         imp:'210k', desc:'2026 FIFA World Cup preparations underway. Ticket sales and squad news trending.',                      url:'https://www.google.com/search?q=world+cup+2026'},
+  {label:'Carnival',    emoji:'🎭',minZoom:1.0,lat:-14,  lng:-51,    country:'Brazil',      imp:'55k',  desc:'Rio Carnival clips viral across every platform. Next year\'s themes already debated.',                  url:'https://www.google.com/search?q=brazil+carnival'},
+  {label:'Premier League',emoji:'🏆',minZoom:1.0,lat:52, lng:-1.5,   country:'England',     imp:'98k',  desc:'Title race going to the wire. VAR controversies dominating football feeds.',                           url:'https://www.google.com/search?q=premier+league'},
+  {label:'Nollywood',   emoji:'🎥',minZoom:1.0,lat:9,   lng:8,      country:'Nigeria',     imp:'33k',  desc:'Nigerian cinema breaking into global streaming with record licensing deals.',                           url:'https://www.google.com/search?q=nollywood'},
+  {label:'Afrobeats',   emoji:'🥁',minZoom:1.0,lat:8,   lng:-1,     country:'Ghana',       imp:'41k',  desc:'Afrobeats artists topping global charts collaborating with major pop stars.',                           url:'https://www.google.com/search?q=afrobeats+trending'},
+  {label:'Techno',      emoji:'🎧',minZoom:1.0,lat:52.5,lng:13.4,   country:'Germany',     imp:'28k',  desc:'Berlin clubs announce massive summer lineups. Techno scene thriving.',                                  url:'https://www.google.com/search?q=berlin+techno'},
+  {label:'BTS',         emoji:'🌟',minZoom:1.0,lat:34,  lng:122,    country:'South Korea', imp:'180k', desc:'BTS completing military service. Comeback generating record pre-saves worldwide.',                      url:'https://www.google.com/search?q=BTS+2026'},
+  {label:'Satoshi',     emoji:'₿', minZoom:1.0,lat:31,  lng:131,    country:'Japan',       imp:'44.2k',desc:'Bitcoin discourse alive with Satoshi identity theories resurging across crypto communities.',           url:'https://www.google.com/search?q=satoshi+nakamoto'},
+  {label:'Afropop',     emoji:'🌍',minZoom:1.0,lat:-26, lng:28,     country:'South Africa',imp:'22k',  desc:'South African artists fusing local sounds with global pop gaining massive followings.',                 url:'https://www.google.com/search?q=afropop+trending'},
+  {label:'K-Drama',     emoji:'📺',minZoom:1.4,lat:37,  lng:125,    country:'South Korea', imp:'76k',  desc:'New Netflix K-drama shattering viewership records in 80 countries its first week.',                     url:'https://www.google.com/search?q=kdrama+trending'},
+  {label:'NBA',         emoji:'🏀',minZoom:1.4,lat:41,  lng:-87,    country:'USA',         imp:'134k', desc:'NBA playoffs heating up with historic performances and buzzer-beater moments.',                         url:'https://www.google.com/search?q=NBA+playoffs'},
+  {label:'Taylor Swift',emoji:'🎶',minZoom:1.4,lat:36,  lng:-86,    country:'USA',         imp:'290k', desc:'Eras Tour final leg breaking concert revenue records across North America.',                            url:'https://www.google.com/search?q=taylor+swift+trending'},
+  {label:'Bundesliga',  emoji:'🦅',minZoom:1.4,lat:48.1,lng:11.5,   country:'Germany',     imp:'44k',  desc:'Bundesliga title race going to final day for first time in a decade.',                                  url:'https://www.google.com/search?q=bundesliga+trending'},
+  {label:'Flamenco',    emoji:'🌹',minZoom:1.4,lat:37.4,lng:-5.9,   country:'Spain',       imp:'12k',  desc:'Flamenco revival trending globally after viral UNESCO celebration performances.',                        url:'https://www.google.com/search?q=flamenco+trending'},
+  {label:'Manga',       emoji:'📖',minZoom:1.6,lat:34.7,lng:135.5,  country:'Japan',       imp:'38k',  desc:'New manga volumes topping Kindle charts in 40 countries simultaneously.',                              url:'https://www.google.com/search?q=manga+trending'},
+  {label:'Capoeira',    emoji:'🤸',minZoom:1.6,lat:-12.9,lng:-38.4, country:'Brazil',      imp:'9k',   desc:'Capoeira tutorials going viral globally as interest in Brazilian martial arts surges.',                 url:'https://www.google.com/search?q=capoeira+trending'},
+];
+
+const root=document.getElementById('root');
+const shell=document.getElementById('shell');
+const canvas=document.getElementById('gc');
+const ctx=canvas.getContext('2d');
+const ringEl=document.getElementById('ring');
+const card=document.getElementById('card');
+const hint=document.getElementById('hint');
+
+let currentBP='desktop';
+let zoom=1.0,targetZoom=1.0;
+const ZOOM_MIN=0.5,ZOOM_MAX=2.8;
+
+function setBP(bp){
+  currentBP=bp;
+  root.className='bp-'+bp;
+  document.querySelectorAll('.bp-btn').forEach(b=>{
+    b.classList.toggle('active',b.dataset.bp===bp);
+  });
+  setTimeout(()=>{ relayout(); card.style.display='none'; },420);
+}
+window.setBP=setBP;
+
+function shellSize(){
+  const r=shell.getBoundingClientRect();
+  return{w:r.width,h:r.height};
+}
+
+function getGlobeRadius(){
+  const{w,h}=shellSize();
+  return Math.min(w,h)*0.34*zoom;
+}
+
+function shellCenter(){
+  const r=shell.getBoundingClientRect();
+  const sr=shell.getBoundingClientRect();
+  return{cx:sr.width/2, cy:sr.height/2};
+}
+
+function relayout(){
+  const R=getGlobeRadius();
+  const{cx,cy}=shellCenter();
+  const SZ=R*2;
+  canvas.width=canvas.height=Math.round(SZ*devicePixelRatio);
+  canvas.style.width=canvas.style.height=SZ+'px';
+  canvas.style.left=cx+'px';
+  canvas.style.top=cy+'px';
+  ringEl.style.width=(SZ+14)+'px';
+  ringEl.style.height=(SZ+14)+'px';
+  ringEl.style.left=cx+'px';
+  ringEl.style.top=cy+'px';
+}
+relayout();
+
+let rotY=0.4,rotX=0.18;
+let velY=0,velX=0;
+let dragging=false,paused=false;
+let prevMX=0,prevMY=0,lastMX=0,lastMY=0;
+let geoData=null;
+let needsRedraw=true;
+
+function ll2sph(lat,lng){
+  const lam=lng*Math.PI/180+rotY,phi=lat*Math.PI/180;
+  const cp=Math.cos(phi),sp=Math.sin(phi);
+  const cl=Math.cos(lam),sl=Math.sin(lam);
+  const cX=Math.cos(rotX),sX=Math.sin(rotX);
+  return{x:cp*sl, y:-(sp*cX-cp*cl*sX), z:sp*sX+cp*cl*cX};
+}
+
+function toScreen(lat,lng){
+  const R=getGlobeRadius();
+  const{cx,cy}=shellCenter();
+  const{x,y,z}=ll2sph(lat,lng);
+  return{sx:cx+x*R, sy:cy+y*R, z};
+}
+
+let offscreenCanvas=null,offscreenCtx=null;
+
+function buildOffscreen(){
+  const R=getGlobeRadius();
+  const SZ=R*2;
+  offscreenCanvas=document.createElement('canvas');
+  offscreenCanvas.width=offscreenCanvas.height=Math.round(SZ*devicePixelRatio);
+  offscreenCtx=offscreenCanvas.getContext('2d');
+}
+
+function drawFrame(){
+  const R=getGlobeRadius();
+  const SZ=R*2;
+  const dpr=devicePixelRatio;
+  const{cx,cy}=shellCenter();
+
+  ctx.save();
+  ctx.scale(dpr,dpr);
+  ctx.clearRect(0,0,SZ,SZ);
+
+  ctx.beginPath();ctx.arc(R,R,R,0,Math.PI*2);
+  ctx.fillStyle='#5ba4e0';ctx.fill();
+
+  if(geoData){
+    ctx.save();
+    ctx.beginPath();ctx.arc(R,R,R,0,Math.PI*2);ctx.clip();
+
+    ctx.fillStyle='#3dba6f';
+    geoData.forEach(poly=>poly.forEach(ring=>{
+      if(ring.length<2)return;
+      let anyFront=false;
+      const pts=ring.map(([lng,lat])=>{
+        const s=toScreen(lat,lng);
+        if(s.z>0)anyFront=true;
+        return{sx:s.sx-cx+R,sy:s.sy-cy+R,z:s.z};
+      });
+      if(!anyFront)return;
+      ctx.beginPath();
+      pts.forEach((p,i)=>i===0?ctx.moveTo(p.sx,p.sy):ctx.lineTo(p.sx,p.sy));
+      ctx.closePath();ctx.fill();
+    }));
+
+    ctx.strokeStyle='rgba(255,255,255,0.88)';
+    ctx.lineWidth=0.85;ctx.lineJoin='round';
+    geoData.forEach(poly=>poly.forEach(ring=>{
+      if(ring.length<2)return;
+      let anyFront=false;
+      const pts=ring.map(([lng,lat])=>{
+        const s=toScreen(lat,lng);
+        if(s.z>0)anyFront=true;
+        return{sx:s.sx-cx+R,sy:s.sy-cy+R};
+      });
+      if(!anyFront)return;
+      ctx.beginPath();
+      pts.forEach((p,i)=>i===0?ctx.moveTo(p.sx,p.sy):ctx.lineTo(p.sx,p.sy));
+      ctx.closePath();ctx.stroke();
+    }));
+
+    ctx.restore();
+  }
+  ctx.restore();
+}
+
+function positionLabels(){
+  labelEls.forEach(({el,trend})=>{
+    if(zoom<trend.minZoom){
+      if(el.style.opacity!=='0'){el.style.opacity='0';el.style.pointerEvents='none';}
+      return;
+    }
+    const{sx,sy,z}=toScreen(trend.lat,trend.lng);
+    const front=z>0.05;
+    const op=front?'1':'0';
+    if(el.style.opacity!==op){el.style.opacity=op;el.style.pointerEvents=front?'auto':'none';}
+    el.style.left=sx+'px';
+    el.style.top=sy+'px';
+  });
+}
+
+let lastRotY=null,lastRotX=null,lastZoom=null;
+
+function loop(){
+  requestAnimationFrame(loop);
+
+  const prevZoom=zoom;
+  zoom+=(targetZoom-zoom)*0.11;
+  if(Math.abs(zoom-targetZoom)<0.0004)zoom=targetZoom;
+  const zoomChanged=Math.abs(zoom-prevZoom)>0.0001;
+  if(zoomChanged)relayout();
+
+  if(!dragging&&!paused){
+    velY*=0.88;velX*=0.88;
+    rotY+=velY*0.003+0.0022;
+    rotX+=velX*0.003;
+    rotX=Math.max(-1.3,Math.min(1.3,rotX));
+  }
+
+  const changed=rotY!==lastRotY||rotX!==lastRotX||zoomChanged;
+  if(changed){
+    drawFrame();
+    positionLabels();
+    lastRotY=rotY;lastRotX=rotX;lastZoom=zoom;
+  }
+}
+
+const labelEls=[];
+ALL_TRENDS.forEach(t=>{
+  const div=document.createElement('div');
+  div.className='lbl';
+  div.innerHTML=`<div class="pill"><span class="icon">${t.emoji}</span><span class="tname">${t.label}</span><span class="dot"></span><span class="imp">${t.imp}</span></div>`;
+  div.addEventListener('click',e=>{e.stopPropagation();openCard(t,div);});
+  shell.appendChild(div);
+  labelEls.push({el:div,trend:t});
+});
+
+function openCard(t,labelEl){
+  paused=true;velX=0;velY=0;
+  document.getElementById('ce').textContent=t.emoji;
+  document.getElementById('ct').textContent=t.label;
+  document.getElementById('cc').textContent=t.country;
+  document.getElementById('cd').textContent=t.desc;
+  document.getElementById('cb').textContent='↑ '+t.imp+' impressions';
+  document.getElementById('ck').onclick=()=>window.open(t.url,'_blank');
+
+  card.style.display='block';
+  card.style.animation='none';
+  card.offsetHeight;
+  card.style.animation='cardPop .18s cubic-bezier(.34,1.3,.64,1)';
+
+  const sr=shell.getBoundingClientRect();
+  const lr=labelEl.getBoundingClientRect();
+  const lx=lr.left+lr.width/2-sr.left;
+  const ly=lr.top+lr.height/2-sr.top;
+  const cardW=272,cardH=310,pad=14,gap=12;
+  let cx=lx+gap,cy=ly-cardH/2;
+  if(cx+cardW>sr.width-pad)cx=lx-cardW-gap;
+  if(cx<pad)cx=pad;
+  if(cy<pad)cy=pad;
+  if(cy+cardH>sr.height-pad)cy=sr.height-cardH-pad;
+  card.style.left=cx+'px';card.style.top=cy+'px';card.style.transform='none';
+}
+
+document.addEventListener('click',e=>{
+  if(!card.contains(e.target)&&!e.target.closest('.lbl')){
+    card.style.display='none';paused=false;
+  }
+});
+
+let hintTimer=setTimeout(()=>{hint.style.opacity='0';},5500);
+
+function onDown(x,y){
+  dragging=true;paused=false;
+  card.style.display='none';
+  velX=velY=0;
+  prevMX=lastMX=x;prevMY=lastMY=y;
+  canvas.classList.add('dragging');
+  clearTimeout(hintTimer);hint.style.opacity='0';
+}
+function onMove(x,y){
+  if(!dragging)return;
+  const dx=x-prevMX,dy=y-prevMY;
+  velY=dx*0.5+velY*0.5;
+  velX=dy*0.5+velX*0.5;
+  lastMX=x;lastMY=y;
+  rotY+=dx*0.005;
+  rotX+=dy*0.005;
+  rotX=Math.max(-1.3,Math.min(1.3,rotX));
+  prevMX=x;prevMY=y;
+}
+function onUp(){dragging=false;canvas.classList.remove('dragging');}
+
+canvas.addEventListener('mousedown',e=>{e.preventDefault();onDown(e.clientX,e.clientY);});
+window.addEventListener('mouseup',onUp);
+window.addEventListener('mousemove',e=>{ if(dragging)onMove(e.clientX,e.clientY); });
+
+canvas.addEventListener('touchstart',e=>{
+  e.preventDefault();
+  if(e.touches.length===1)onDown(e.touches[0].clientX,e.touches[0].clientY);
+},{passive:false});
+window.addEventListener('touchend',e=>{if(e.touches.length===0)onUp();});
+
+let pinchDist=null;
+window.addEventListener('touchmove',e=>{
+  e.preventDefault();
+  if(e.touches.length===1&&dragging){
+    onMove(e.touches[0].clientX,e.touches[0].clientY);
+  }else if(e.touches.length===2&&pinchDist!==null){
+    const d=Math.hypot(e.touches[0].clientX-e.touches[1].clientX,e.touches[0].clientY-e.touches[1].clientY);
+    targetZoom=Math.max(ZOOM_MIN,Math.min(ZOOM_MAX,targetZoom*(d/pinchDist)));
+    pinchDist=d;
+  }
+},{passive:false});
+canvas.addEventListener('touchstart',e=>{
+  if(e.touches.length===2)pinchDist=Math.hypot(e.touches[0].clientX-e.touches[1].clientX,e.touches[0].clientY-e.touches[1].clientY);
+},{passive:true});
+window.addEventListener('touchend',()=>{if(event.touches.length<2)pinchDist=null;});
+
+shell.addEventListener('wheel',e=>{
+  e.preventDefault();
+  const delta=-e.deltaY*(e.deltaMode===1?0.05:0.001);
+  targetZoom=Math.max(ZOOM_MIN,Math.min(ZOOM_MAX,targetZoom*Math.exp(delta*0.8)));
+},{passive:false});
+
+window.addEventListener('resize',()=>{relayout();});
+
+fetch('https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json')
+  .then(r=>r.json())
+  .then(world=>{
+    const features=topojson.feature(world,world.objects.countries).features;
+    geoData=[];
+    features.forEach(f=>{
+      const polys=f.geometry.type==='Polygon'?[f.geometry.coordinates]:f.geometry.coordinates;
+      geoData.push(...polys);
+    });
+    requestAnimationFrame(loop);
+  });
+</script>
+</body>
+</html>
